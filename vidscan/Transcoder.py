@@ -153,17 +153,12 @@ class Transcoder(object):
 
 			try:
 				self.scheduler.start(videofile, destfullpath)
+				is_success = self.transcode(videofile, transcoder_args)
+				self.scheduler.end(videofile, is_success)
 			except LockError:
 				log.info('Couldn\'t acquire a lock. Skipping file: ' + destfullpath)
-				videofile = self.scheduler.get_next_videofile()
-				continue
-
-			is_success = self.transcode(videofile, transcoder_args)
-
-			self.scheduler.end(videofile, is_success)
 
 			videofile = self.scheduler.get_next_videofile()
-
 
 class FFmpegTranscoder(FFmpegMixin, Transcoder):
 	pass

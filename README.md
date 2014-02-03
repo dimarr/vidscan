@@ -44,10 +44,12 @@ Also on windows it's helpful to add the python scripts folder (e.g. `c:\Python27
 
 ## Installing
 
-### Windows
-From project folder run `python setup.py install`
+### Windows/Linux/OSX
+From project folder run:
 
-    $ python setup.py install
+        $ git clone https://github.com/dimarr/vidscan.git
+    $ cd vidscan
+        $ python setup.py install
     
 ## Running
 

@@ -106,8 +106,9 @@ def main():
     \  /  | | (_| |____) | (_| (_| | | | |
      \/   |_|\__,_|_____/ \___\__,_|_| |_|
 
- 2014
  github.com/dimarr/vidscan
+ The MIT License (MIT)
+ Copyright (c) 2014 Dmitri Rodik
 	''', 'blue')
 	cprint('Logging to ' + vidscan_log_file, 'cyan')
 	log.info('Source dir is ' + srcdir, 'yellow')
