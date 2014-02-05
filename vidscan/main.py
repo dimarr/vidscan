@@ -52,11 +52,11 @@ Misc:
 
 def main():
 
-	srcdir = ''
-	dstdir = ''
-	yestranscode = ''
-	whatif = ''
-	datafile = ''
+	srcdir = None 
+	dstdir = None
+	yestranscode = None
+	whatif = None
+	datafile = None
 	try:
 		optlist, args = getopt.getopt(sys.argv[1:],"hs:d:ywf:",["help","src=", "dst=","","whatif","datafile","debug-short-transcode", "debug-log-enable"])
 	except getopt.GetoptError as e:
@@ -106,9 +106,9 @@ def main():
     \  /  | | (_| |____) | (_| (_| | | | |
      \/   |_|\__,_|_____/ \___\__,_|_| |_|
 
- github.com/dimarr/vidscan
  The MIT License (MIT)
  Copyright (c) 2014 Dmitri Rodik
+ github.com/dimarr/vidscan
 	''', 'blue')
 	cprint('Logging to ' + vidscan_log_file, 'cyan')
 	log.info('Source dir is ' + srcdir, 'yellow')
@@ -116,7 +116,7 @@ def main():
 	"""
 	Scanner
 	"""
-	data_out = ''
+	data_out = None
 	if datafile:
 		data_out = open(datafile, 'w')
 
@@ -129,16 +129,19 @@ def main():
 	"""
 	Scheduler
 	"""
-	scheduler = Scheduler(result.videofiles, dstdir)
-
 	completed_dict = {}
+	scheduler = None
 
-	for tupl in scheduler.get_completed_list():
-		instance_name = tupl[0]
-		videofile = tupl[1]
-		destinationfile = tupl[2]
-		destinationfile.relpath
-		completed_dict[videofile.relpath] = tupl
+	if not whatif:
+		scheduler = Scheduler(result.videofiles, dstdir)
+
+
+		for tupl in scheduler.get_completed_list():
+			instance_name = tupl[0]
+			videofile = tupl[1]
+			destinationfile = tupl[2]
+			destinationfile.relpath
+			completed_dict[videofile.relpath] = tupl
 
 
 	"""
@@ -153,17 +156,20 @@ def main():
 	log.info('# Audio Codecs Found:', 'yellow')
 	log.info(common.json_prettify(result.a_codec_count_map))
 
-	log.info('Previously completed transcodes:', 'yellow')
-	for vf in result.videofiles:
-		if vf.relpath in completed_dict:
-			tupl = completed_dict[vf.relpath]
-			instance_name = tupl[0]
-			videofile = tupl[1]
-			destinationfile = tupl[2]
+	log.info('Previously Completed Transcodes:', 'yellow')
+	if len(completed_dict) > 0:
+		for vf in result.videofiles:
+			if vf.relpath in completed_dict:
+				tupl = completed_dict[vf.relpath]
+				instance_name = tupl[0]
+				videofile = tupl[1]
+				destinationfile = tupl[2]
+				
+				log.info(os.path.join(dstdir,destinationfile.relpath) + ' (status=' + destinationfile.status + ', instance=' + instance_name + ')')
+	else:
+		log.info('None')
 			
-			log.info(os.path.join(dstdir,destinationfile.relpath) + ' (status=' + destinationfile.status + ', instance=' + instance_name + ')')
-			
-	log.info('Files to transcode:', 'yellow')
+	log.info('Files to Transcode:', 'yellow')
 	num_transcode = 0
 	for vf in result.videofiles:
 		if vf.op_flag and vf.relpath not in completed_dict:
@@ -183,7 +189,7 @@ def main():
 		log.info('No transcoding needed. Exiting.', 'cyan')
 		sys.exit()
 
-	do_continue = ''
+	do_continue = None
 	if yestranscode:
 		do_continue = 'y'
 
@@ -191,7 +197,7 @@ def main():
 		do_continue = raw_input(colored('\nFound ' + str(num_transcode) + ' files to transcode. Do you wish to Continue (y/n) ? ', 'yellow'))
 		if do_continue not in ['y','n']:
 			print 'Invalid choice: ' + do_continue + '. Please try again.'
-			do_continue = ''
+			do_continue = None
 
 	if do_continue.strip().lower() != 'y':
 		log.info('Exiting as per user command')

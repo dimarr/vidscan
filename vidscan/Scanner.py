@@ -59,7 +59,7 @@ class Scanner(object):
 					try:
 						videoObj = self.processFile(fullpath, lines)
 					except Exception as e:
-						log.error('Error processing file (' + file + '): ' + e.value)
+						log.error('Error processing file (' + file + '): ' + str(e))
 
 					# Basic integrity check. Assume if duration is set then it's a valid video file
 					if videoObj and videoObj.duration:
@@ -67,7 +67,7 @@ class Scanner(object):
 					else:
 						log.error('Cannot process file. Check if valid video using "ffmpeg -i <file>": ' + file)
 				else:
-					log.warn('Unhandled file/extension: ' + file)
+					log.debug('Unhandled file/extension: ' + file)
 
 		return videoObjs
 
