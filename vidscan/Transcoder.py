@@ -87,7 +87,7 @@ class FFmpegTranscoder(Transcoder):
 				ffmpeg_args.append('high10')
 
 			ffmpeg_args.append('-crf')
-			ffmpeg_args.append('20')
+			ffmpeg_args.append('23')
 
 			ffmpeg_args.append('-preset')
 			ffmpeg_args.append('veryfast')
@@ -143,6 +143,7 @@ class FFmpegTranscoder(Transcoder):
 		hour, minute, second = videofile.duration.split(':')
 		target_seconds = float(hour) * 3600 + float(minute) * 60 + float(second)
 
+		avg_fps, encode_time_start, num_samples = (0, time.time(), 0)
 		while process.poll() is None or not queue.empty():
 			if not queue.empty():
 				chunk = queue.get()
@@ -151,28 +152,31 @@ class FFmpegTranscoder(Transcoder):
 				for line in chunk.split("\n"):
 					match = re.search('frame=\s*([^\s]+)\s*fps=\s*([^\s]+)\s*q=\s*([^\s]+)\s*size=\s*([^\s]+)\s*time=\s*([^\s]+)\s*bitrate=\s*([^\s]+)\s*', line)
 					if match:
-						frame, fps, q, size, time, bitrate = match.groups()
-						hour, minute, second = time.split(':')
+						frame, fps, q, size, video_time, bitrate = match.groups()
+						hour, minute, second = video_time.split(':')
 						current_seconds = float(hour) * 3600 + float(minute) * 60 + float(second)
 						progress = int(current_seconds/target_seconds*10000) / 100.0
 
+						avg_fps += float(fps)
+						num_samples += 1
+						
 						sys.stdout.write(
-							("Transcoding progress ({progress}%) "	
+							("In progress ({progress}%) "	
 							+ "fps = {fps} "
-							+ "time = {time} "
+							+ "time = {video_time} "
 							+ "bitrate = {bitrate} "
 							+ "size = {size} "
 							+ "\r").format( 
 								progress = progress,
 								fps = fps,
-								time = time,
+								video_time = video_time,
 								bitrate = bitrate,
 								size = size
 							)
 						)
 						sys.stdout.flush()
 
-		sys.stdout.write('                                                                                                      \r')
+		sys.stdout.write('                                                                                             \r')
 		sys.stdout.flush()
 
 		process.wait()
@@ -182,6 +186,15 @@ class FFmpegTranscoder(Transcoder):
 			log.error('ERROR: transcoding ' + filename + ' closed with unsuccessful exit code: ' + str(process.returncode))
 			return False
 
+		avg_fps = int(avg_fps / num_samples)
+		total_sec = int(time.time() - encode_time_start)
+		total_min = int(total_sec / 60.0)
+		remainder_sec = total_sec % 60
+		encode_time = str(remainder_sec) + 's'
+		if total_min > 0:
+			encode_time = str(total_min) + 'm ' + encode_time
+		sys.stdout.write(("Encode time = {encode_time}, Avg fps = {fps}\n").format(encode_time = encode_time, fps = avg_fps))
+		sys.stdout.flush()
 		log.info('Finished ' + filename, 'green')
 		return True
 

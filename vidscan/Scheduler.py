@@ -73,6 +73,8 @@ class Scheduler(object):
 
 	def attach_cleanup_listener(self):
 		def clean(signum, frame):
+			print '\n'
+			
 			try:
 				log.debug('Removing lock file: ' + self.lock_fullpath)
 				self.lock.close()
