@@ -18,7 +18,42 @@ from Scheduler import Scheduler, LockError
 
 log = AppLogger(__name__)
 
-class FFmpegMixin(object):
+class Transcoder(object):
+	def __init__(self, destpath, videofiles, scheduler):
+		self.destpath = destpath
+		self.videofiles = videofiles
+		self.scheduler = scheduler
+
+		scheduler.attach_cleanup_listener()
+		self.init_transcoder()
+	
+	def init_transcoder(self):
+		pass
+
+	def get_transcoder_args(self, videofile):
+		pass
+
+	def transcode(self, videofile, transcoder_args):
+		pass
+	
+	def run(self):
+		"""
+		Start the transcoding loop
+		"""
+		videofile = self.scheduler.get_next_videofile()
+		while videofile is not None:
+			transcoder_args, destfullpath = self.get_transcoder_args(videofile)
+
+			try:
+				self.scheduler.start(videofile, destfullpath)
+				is_success = self.transcode(videofile, transcoder_args)
+				self.scheduler.end(videofile, is_success)
+			except LockError:
+				log.info('Couldn\'t acquire a lock. Skipping file: ' + destfullpath)
+
+			videofile = self.scheduler.get_next_videofile()
+
+class FFmpegTranscoder(Transcoder):
 	def init_transcoder(self):
 		"""
 		Check for x264 support and detect the supported bit depth which will later influence ffmpeg args
@@ -75,17 +110,12 @@ class FFmpegMixin(object):
 	def transcode(self, videofile, ffmpeg_args):
 		filename = os.path.basename(videofile.fullpath)
 
-		log.info('STARTING: ' + filename, 'yellow')
+		log.info('Starting ' + filename)
 		log.debug('CMD = ' + " ".join(ffmpeg_args))
 
 		def log_queue_worker(pipe, queue, stop_event):
-			"""
-			Read line-by-line from pipe, writing (tag, line) to the
-			queue. Also checks for a stop_event to give up before
-			the end of the stream.
-			"""
 			while True:
-				chunk = pipe.read(1000)
+				chunk = pipe.read(256)
 				while True:
 					try:
 						# Post to the queue with a large timeout in case the
@@ -100,7 +130,6 @@ class FFmpegMixin(object):
 					break
 			pipe.close()
 
-
 		queue = Queue.Queue(1000)
 		stop_event = threading.Event()
 		
@@ -110,10 +139,41 @@ class FFmpegMixin(object):
 		thread.daemon = True
 		thread.start()
 
+
+		hour, minute, second = videofile.duration.split(':')
+		target_seconds = float(hour) * 3600 + float(minute) * 60 + float(second)
+
 		while process.poll() is None or not queue.empty():
 			if not queue.empty():
-				log.info(queue.get())
+				chunk = queue.get()
+				log.debug(chunk)
 				queue.task_done()
+				for line in chunk.split("\n"):
+					match = re.search('frame=\s*([^\s]+)\s*fps=\s*([^\s]+)\s*q=\s*([^\s]+)\s*size=\s*([^\s]+)\s*time=\s*([^\s]+)\s*bitrate=\s*([^\s]+)\s*', line)
+					if match:
+						frame, fps, q, size, time, bitrate = match.groups()
+						hour, minute, second = time.split(':')
+						current_seconds = float(hour) * 3600 + float(minute) * 60 + float(second)
+						progress = int(current_seconds/target_seconds*10000) / 100.0
+
+						sys.stdout.write(
+							("Transcoding progress ({progress}%) "	
+							+ "fps = {fps} "
+							+ "time = {time} "
+							+ "bitrate = {bitrate} "
+							+ "size = {size} "
+							+ "\r").format( 
+								progress = progress,
+								fps = fps,
+								time = time,
+								bitrate = bitrate,
+								size = size
+							)
+						)
+						sys.stdout.flush()
+
+		sys.stdout.write('                                                                                                      \r')
+		sys.stdout.flush()
 
 		process.wait()
 		thread.join(10)
@@ -122,45 +182,6 @@ class FFmpegMixin(object):
 			log.error('ERROR: transcoding ' + filename + ' closed with unsuccessful exit code: ' + str(process.returncode))
 			return False
 
-		log.info('FINISHED: ' + filename, 'green')
+		log.info('Finished ' + filename, 'green')
 		return True
-
-class Transcoder(object):
-	def __init__(self, destpath, videofiles, scheduler):
-		self.destpath = destpath
-		self.videofiles = videofiles
-		self.scheduler = scheduler
-
-		scheduler.attach_cleanup_listener()
-		self.init_transcoder()
-	
-	def init_transcoder(self):
-		pass
-
-	def get_transcoder_args(self, videofile):
-		pass
-
-	def transcode(self, videofile, transcoder_args):
-		pass
-	
-	def run(self):
-		"""
-		Start the transcoding loop
-		"""
-		videofile = self.scheduler.get_next_videofile()
-		while videofile is not None:
-			transcoder_args, destfullpath = self.get_transcoder_args(videofile)
-
-			try:
-				self.scheduler.start(videofile, destfullpath)
-				is_success = self.transcode(videofile, transcoder_args)
-				self.scheduler.end(videofile, is_success)
-			except LockError:
-				log.info('Couldn\'t acquire a lock. Skipping file: ' + destfullpath)
-
-			videofile = self.scheduler.get_next_videofile()
-
-class FFmpegTranscoder(FFmpegMixin, Transcoder):
-	pass
-
 
